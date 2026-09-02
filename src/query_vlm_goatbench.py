@@ -29,6 +29,9 @@ def query_vlm_for_response(
     step_dict["snapshot_objects"] = {}
     step_dict["snapshot_imgs"] = {}
     step_dict["use_full_obj_list"] = cfg.use_full_obj_list
+    step_dict["show_object_ids"] = bool(
+        subtask_metadata.get("show_object_ids", False)
+    )
     for rgb_id, snapshot in scene.snapshots.items():
         resized_rgb = resize_image(
             scene.all_observations[rgb_id], cfg.prompt_h, cfg.prompt_w

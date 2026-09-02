@@ -1,4 +1,5 @@
 results/
+weights/
 *.pt
 *.pyc
 *.xml

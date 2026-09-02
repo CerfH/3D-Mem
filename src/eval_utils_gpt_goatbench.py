@@ -45,9 +45,9 @@ def call_openai_api(sys_prompt, contents) -> Optional[str]:
     while retry_count < max_tries:
         try:
             completion = client.chat.completions.create(
-                model="gpt-4o",  # model = "deployment_name"
+                model=OPENAI_MODEL,
                 messages=message_text,
-                temperature=0.7,
+                temperature=OPENAI_TEMPERATURE,
                 max_tokens=4096,
                 top_p=0.95,
                 frequency_penalty=0,
@@ -160,6 +160,19 @@ def get_step_info(step, verbose=False):
             logging.info(
                 f"Prefiltering snapshot: {n_prev_snapshot} -> {len(snapshot_full_imgs)}"
             )
+
+    # Benchmark adapters may expose the agent's own persistent scene-memory
+    # IDs so later rounds can avoid intentionally reporting the same physical
+    # candidate. Keep raw class names during prefiltering, then annotate only
+    # the final prompt-facing labels so native class selection is unchanged.
+    if step.get("show_object_ids", False):
+        for rgb_id, classes in snapshot_classes.items():
+            original_indices = keep_index_snapshot[rgb_id]
+            snapshot_classes[rgb_id] = [
+                f"{class_name} [agent object id: "
+                f"{step['snapshot_imgs'][rgb_id]['object_crop'][original_index]['obj_id']}]"
+                for class_name, original_index in zip(classes, original_indices)
+            ]
 
     return (
         question,
