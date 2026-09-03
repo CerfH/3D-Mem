@@ -197,8 +197,10 @@ def format_explore_prompt(
     egocentric_view=False,
     use_snapshot_class=True,
     image_goal=None,
+    allow_finish=False,
 ):
-    sys_prompt = "Task: You are an agent in an indoor scene that is able to observe the surroundings and explore the environment. You are tasked with indoor navigation, and you are required to choose either a Snapshot or a Frontier image to explore and find the target object required in the question.\n"
+    choices = "a Snapshot, a Frontier image, or Finish" if allow_finish else "either a Snapshot or a Frontier image"
+    sys_prompt = f"Task: You are an agent in an indoor scene that is able to observe the surroundings and explore the environment. You are tasked with indoor navigation, and you are required to choose {choices} to explore and find the target object required in the question.\n"
 
     content = []
     # 1 here is some basic info
@@ -209,6 +211,12 @@ def format_explore_prompt(
         + "Therefore, if you choose a snapshot, you should also choose the object in the snapshot that you think is the answer to the question.\n"
     )
     text += "Frontier: An unexplored region that could potentially lead to new information for answering the question. Selecting a frontier means that you will further explore that direction.\n"
+    if allow_finish:
+        text += (
+            "Finish: End the entire episode because, based only on your own observations, "
+            "persistent scene memory, and report history, you believe no additional distinct "
+            "matching physical instance remains to be found. Do not assume a hidden target count.\n"
+        )
 
     # 2 here is the question
     text += f"Question: {question}"
@@ -219,6 +227,8 @@ def format_explore_prompt(
         content.append((text + "\n",))
 
     text = "Select the Frontier/Snapshot that would help find the answer of the question.\n"
+    if allow_finish:
+        text = "Select a Frontier/Snapshot to continue searching, or Finish to end the episode.\n"
     content.append((text,))
 
     # 3 here is the egocentric views
@@ -261,6 +271,8 @@ def format_explore_prompt(
     # 6 here is the format of the answer
     text = "Please provide your answer in the following format: 'Snapshot i, Object j' or 'Frontier i', where i, j are the index of the snapshot or frontier you choose. "
     text += "For example, if you choose the fridge in the first snapshot, please return 'Snapshot 0, Object 2', where 2 is the index of the fridge in that snapshot.\n"
+    if allow_finish:
+        text += "To end the episode, output exactly 'Finish' on the first line.\n"
     text += "You can explain the reason for your choice, but put it in a new line after the choice.\n"
     content.append((text,))
 
@@ -390,6 +402,7 @@ def explore_step(step, cfg, verbose=False):
         egocentric_view=step.get("use_egocentric_views", False),
         use_snapshot_class=True,
         image_goal=image_goal,
+        allow_finish=bool(step.get("allow_finish", False)),
     )
 
     if verbose:
@@ -418,6 +431,10 @@ def explore_step(step, cfg, verbose=False):
         else:
             reason = ""
         response = response.lower()
+        if step.get("allow_finish", False) and response.rstrip(".!") == "finish":
+            final_response = "finish"
+            final_reason = reason
+            break
         try:
             choice_type, choice_id = response.split(",")[0].strip().split(" ")
         except Exception as e:

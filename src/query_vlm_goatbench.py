@@ -16,7 +16,7 @@ def query_vlm_for_response(
     rgb_egocentric_views: list,
     cfg,
     verbose: bool = False,
-) -> Optional[Tuple[Union[SnapShot, Frontier], int]]:
+) -> Optional[Tuple[Union[SnapShot, Frontier, str], int]]:
     # prepare input for vlm
     step_dict = {}
 
@@ -32,6 +32,7 @@ def query_vlm_for_response(
     step_dict["show_object_ids"] = bool(
         subtask_metadata.get("show_object_ids", False)
     )
+    step_dict["allow_finish"] = bool(subtask_metadata.get("allow_finish", False))
     for rgb_id, snapshot in scene.snapshots.items():
         resized_rgb = resize_image(
             scene.all_observations[rgb_id], cfg.prompt_h, cfg.prompt_w
@@ -109,6 +110,10 @@ def query_vlm_for_response(
         logging.error(f"explore_step failed and returned None")
         return None
     logging.info(f"Response: [{outputs}]\nReason: [{reason}]")
+
+    if outputs == "finish" and step_dict["allow_finish"]:
+        logging.info("Next choice: Finish")
+        return "finish", n_filtered_snapshots
 
     # parse returned results
     try:
